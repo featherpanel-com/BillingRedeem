@@ -111,15 +111,23 @@ class BillingRedeemController
                 return ApiResponse::error('This code is no longer valid', 'CODE_INVALID', 400);
             }
 
-            // Record usage
-            $usageRecorded = RedeemUsage::recordUsage($user['id'], (int) $redeemCode['id']);
+            // Record usage (use same PDO connection for transaction)
+            $usageRecorded = RedeemUsage::recordUsage($user['id'], (int) $redeemCode['id'], $pdo);
             if (!$usageRecorded) {
                 $pdo->rollBack();
+                // Check if it's a duplicate (user already used this code)
+                if (RedeemUsage::hasUserUsedCode($user['id'], (int) $redeemCode['id'])) {
+                    return ApiResponse::error('You have already used this code', 'CODE_ALREADY_USED', 400);
+                }
                 return ApiResponse::error('Failed to record code usage', 'USAGE_FAILED', 500);
             }
 
-            // Increment code uses
-            RedeemCode::incrementUses((int) $redeemCode['id']);
+            // Increment code uses (use same PDO connection for transaction)
+            $incremented = RedeemCode::incrementUses((int) $redeemCode['id'], $pdo);
+            if (!$incremented) {
+                $pdo->rollBack();
+                return ApiResponse::error('Failed to increment code uses', 'INCREMENT_FAILED', 500);
+            }
 
             // Add credits to user
             $amount = (int) $redeemCode['amount'];

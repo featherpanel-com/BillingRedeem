@@ -110,18 +110,24 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-8">
+  <div
+    class="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-8"
+  >
     <div class="max-w-5xl mx-auto space-y-8">
       <!-- Header Section -->
       <div class="text-center space-y-4">
         <div class="flex items-center justify-center gap-3">
           <div class="relative">
-            <div class="absolute inset-0 bg-primary/20 blur-2xl rounded-full"></div>
+            <div
+              class="absolute inset-0 bg-primary/20 blur-2xl rounded-full"
+            ></div>
             <Gift class="relative h-12 w-12 text-primary" />
           </div>
         </div>
         <div>
-          <h1 class="text-5xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+          <h1
+            class="text-5xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent"
+          >
             Redeem Codes
           </h1>
           <p class="text-lg text-muted-foreground mt-2">
@@ -167,10 +173,7 @@ onMounted(() => {
               class="w-full h-12 text-lg font-semibold shadow-lg hover:shadow-xl transition-all"
               size="lg"
             >
-              <Loader2
-                v-if="redeeming"
-                class="mr-2 h-5 w-5 animate-spin"
-              />
+              <Loader2 v-if="redeeming" class="mr-2 h-5 w-5 animate-spin" />
               <Gift v-else class="mr-2 h-5 w-5" />
               {{ redeeming ? "Redeeming..." : "Redeem Code" }}
             </Button>
@@ -188,8 +191,9 @@ onMounted(() => {
               <div class="text-sm text-muted-foreground">
                 <p class="font-medium text-foreground mb-1">How it works</p>
                 <p>
-                  Enter your redemption code above and click "Redeem Code" to instantly receive credits to your account. 
-                  You can view your redemption history below.
+                  Enter your redemption code above and click "Redeem Code" to
+                  instantly receive credits to your account. You can view your
+                  redemption history below.
                 </p>
               </div>
             </div>
@@ -251,8 +255,12 @@ onMounted(() => {
                 class="group flex items-center justify-between p-5 border-2 rounded-xl hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 cursor-pointer"
               >
                 <div class="flex items-center gap-4 flex-1">
-                  <div class="p-3 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
-                    <CheckCircle2 class="h-6 w-6 text-green-600 dark:text-green-400" />
+                  <div
+                    class="p-3 rounded-lg bg-green-500/10 group-hover:bg-green-500/20 transition-colors"
+                  >
+                    <CheckCircle2
+                      class="h-6 w-6 text-green-600 dark:text-green-400"
+                    />
                   </div>
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-3 mb-1.5">

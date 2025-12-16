@@ -62,8 +62,10 @@ class RedeemUsage
 
     /**
      * Record that a user has used a code.
+     * 
+     * @param \PDO|null $pdo Optional PDO connection to use (for transactions)
      */
-    public static function recordUsage(int $userId, int $codeId): bool
+    public static function recordUsage(int $userId, int $codeId, ?\PDO $pdo = null): bool
     {
         if ($userId <= 0 || $codeId <= 0) {
             return false;
@@ -73,7 +75,9 @@ class RedeemUsage
             return false;
         }
 
-        $pdo = Database::getPdoConnection();
+        if ($pdo === null) {
+            $pdo = Database::getPdoConnection();
+        }
 
         try {
             $stmt = $pdo->prepare(
@@ -89,9 +93,10 @@ class RedeemUsage
         } catch (\PDOException $e) {
             // Handle duplicate key (user already used this code)
             if ($e->getCode() === '23000') {
+                App::getInstance(true)->getLogger()->warning('User already used code: ' . $e->getMessage());
                 return false;
             }
-            App::getInstance(true)->getLogger()->error('Failed to record code usage: ' . $e->getMessage());
+            App::getInstance(true)->getLogger()->error('Failed to record code usage: ' . $e->getMessage() . ' | Code: ' . $e->getCode());
 
             return false;
         }
