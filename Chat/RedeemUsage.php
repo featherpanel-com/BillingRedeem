@@ -31,8 +31,8 @@
 namespace App\Addons\billingredeem\Chat;
 
 use App\App;
-use App\Chat\Database;
 use App\Chat\User;
+use App\Chat\Database;
 
 /**
  * Redeem Usage chat model for tracking code usage.
@@ -62,7 +62,7 @@ class RedeemUsage
 
     /**
      * Record that a user has used a code.
-     * 
+     *
      * @param \PDO|null $pdo Optional PDO connection to use (for transactions)
      */
     public static function recordUsage(int $userId, int $codeId, ?\PDO $pdo = null): bool
@@ -94,6 +94,7 @@ class RedeemUsage
             // Handle duplicate key (user already used this code)
             if ($e->getCode() === '23000') {
                 App::getInstance(true)->getLogger()->warning('User already used code: ' . $e->getMessage());
+
                 return false;
             }
             App::getInstance(true)->getLogger()->error('Failed to record code usage: ' . $e->getMessage() . ' | Code: ' . $e->getCode());
@@ -268,4 +269,3 @@ class RedeemUsage
         return $user !== null;
     }
 }
-

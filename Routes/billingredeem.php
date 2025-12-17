@@ -177,4 +177,3 @@ return function (RouteCollection $routes): void {
         ['GET']
     );
 };
-

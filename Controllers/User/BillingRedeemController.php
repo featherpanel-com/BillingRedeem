@@ -33,12 +33,12 @@ namespace App\Addons\billingredeem\Controllers\User;
 use App\Helpers\ApiResponse;
 use OpenApi\Attributes as OA;
 use App\Addons\billingredeem\Chat\RedeemCode;
-use App\Addons\billingredeem\Chat\RedeemUsage;
-use App\Addons\billingredeem\Helpers\RedeemHelper;
 use Symfony\Component\HttpFoundation\Request;
+use App\Addons\billingredeem\Chat\RedeemUsage;
 use Symfony\Component\HttpFoundation\Response;
 use App\Addons\billingcore\Helpers\CreditsHelper;
 use App\Addons\billingcore\Helpers\CurrencyHelper;
+use App\Addons\billingredeem\Helpers\RedeemHelper;
 
 #[OA\Tag(name: 'User - Billing Redeem', description: 'Redeem codes management for users')]
 class BillingRedeemController
@@ -108,6 +108,7 @@ class BillingRedeemController
 
             if (!$lockedCode || !RedeemCode::isValid($lockedCode)) {
                 $pdo->rollBack();
+
                 return ApiResponse::error('This code is no longer valid', 'CODE_INVALID', 400);
             }
 
@@ -119,6 +120,7 @@ class BillingRedeemController
                 if (RedeemUsage::hasUserUsedCode($user['id'], (int) $redeemCode['id'])) {
                     return ApiResponse::error('You have already used this code', 'CODE_ALREADY_USED', 400);
                 }
+
                 return ApiResponse::error('Failed to record code usage', 'USAGE_FAILED', 500);
             }
 
@@ -126,6 +128,7 @@ class BillingRedeemController
             $incremented = RedeemCode::incrementUses((int) $redeemCode['id'], $pdo);
             if (!$incremented) {
                 $pdo->rollBack();
+
                 return ApiResponse::error('Failed to increment code uses', 'INCREMENT_FAILED', 500);
             }
 
@@ -134,6 +137,7 @@ class BillingRedeemController
             $added = CreditsHelper::addUserCredits($user['id'], $amount);
             if (!$added) {
                 $pdo->rollBack();
+
                 return ApiResponse::error('Failed to add credits', 'CREDITS_FAILED', 500);
             }
 
@@ -176,8 +180,8 @@ class BillingRedeemController
             return ApiResponse::error('User not authenticated', 'UNAUTHORIZED', 401);
         }
 
-        $limit = (int) ($request->query->get('limit', 50));
-        $offset = (int) ($request->query->get('offset', 0));
+        $limit = (int) $request->query->get('limit', 50);
+        $offset = (int) $request->query->get('offset', 0);
 
         if ($limit > 100) {
             $limit = 100;
@@ -197,4 +201,3 @@ class BillingRedeemController
         ], 'History retrieved successfully', 200);
     }
 }
-

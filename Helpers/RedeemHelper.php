@@ -96,4 +96,3 @@ class RedeemHelper
         PluginSettings::setSetting(self::PLUGIN_IDENTIFIER, $key, $value);
     }
 }
-

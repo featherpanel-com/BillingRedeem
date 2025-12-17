@@ -103,7 +103,7 @@ class RedeemCode
 
     /**
      * Increment the uses count for a code.
-     * 
+     *
      * @param \PDO|null $pdo Optional PDO connection to use (for transactions)
      */
     public static function incrementUses(int $codeId, ?\PDO $pdo = null): bool
@@ -260,4 +260,3 @@ class RedeemCode
         return $result ? (int) $result['count'] : 0;
     }
 }
-

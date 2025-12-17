@@ -33,11 +33,11 @@ namespace App\Addons\billingredeem\Controllers\Admin;
 use App\Helpers\ApiResponse;
 use OpenApi\Attributes as OA;
 use App\Addons\billingredeem\Chat\RedeemCode;
-use App\Addons\billingredeem\Chat\RedeemUsage;
-use App\Addons\billingredeem\Helpers\RedeemHelper;
 use Symfony\Component\HttpFoundation\Request;
+use App\Addons\billingredeem\Chat\RedeemUsage;
 use Symfony\Component\HttpFoundation\Response;
 use App\Addons\billingcore\Helpers\CurrencyHelper;
+use App\Addons\billingredeem\Helpers\RedeemHelper;
 
 #[OA\Tag(name: 'Admin - Billing Redeem', description: 'Redeem codes administration')]
 class BillingRedeemController
@@ -95,8 +95,8 @@ class BillingRedeemController
     )]
     public function getCodes(Request $request): Response
     {
-        $limit = (int) ($request->query->get('limit', 50));
-        $offset = (int) ($request->query->get('offset', 0));
+        $limit = (int) $request->query->get('limit', 50);
+        $offset = (int) $request->query->get('offset', 0);
 
         if ($limit > 100) {
             $limit = 100;
@@ -293,8 +293,8 @@ class BillingRedeemController
             return ApiResponse::error('Code not found', 'CODE_NOT_FOUND', 404);
         }
 
-        $limit = (int) ($request->query->get('limit', 50));
-        $offset = (int) ($request->query->get('offset', 0));
+        $limit = (int) $request->query->get('limit', 50);
+        $offset = (int) $request->query->get('offset', 0);
 
         if ($limit > 100) {
             $limit = 100;
@@ -314,4 +314,3 @@ class BillingRedeemController
         ], 'Usage retrieved successfully', 200);
     }
 }
-
