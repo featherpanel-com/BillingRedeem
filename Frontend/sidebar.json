@@ -20,7 +20,7 @@
       "component": "/billingredeem/dist/admin.html",
       "description": "Manage redemption codes and view usage",
       "category": "admin",
-      "group": "Billing"
+      "group": "Fremium Earn Credits"
     }
   },
   "server": {}
