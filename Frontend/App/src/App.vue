@@ -3,7 +3,7 @@
 </script>
 
 <template>
-  <div class="min-h-screen bg-background text-foreground">
+  <div class="text-foreground">
     <slot />
   </div>
 </template>

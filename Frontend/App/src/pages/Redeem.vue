@@ -110,9 +110,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div
-    class="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-8"
-  >
+  <div class="min-h-screen p-4 md:p-8">
     <div class="max-w-5xl mx-auto space-y-8">
       <!-- Header Section -->
       <div class="text-center space-y-4">
@@ -187,7 +185,7 @@ onMounted(() => {
           <!-- Info Box -->
           <div class="mt-6 p-4 rounded-lg bg-muted/50 border border-border/50">
             <div class="flex items-start gap-3">
-              <TrendingUp class="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+              <TrendingUp class="h-5 w-5 text-primary mt-0.5 shrink-0" />
               <div class="text-sm text-muted-foreground">
                 <p class="font-medium text-foreground mb-1">How it works</p>
                 <p>

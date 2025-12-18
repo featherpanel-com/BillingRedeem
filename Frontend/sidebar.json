@@ -1,10 +1,10 @@
 {
   "client": {
-    "/billingredeem": {
+    "/earn/redeem": {
       "name": "Redeem Codes",
       "icon": "🎟️",
       "showBadge": false,
-      "redirect": "/billingredeem",
+      "redirect": "/earn/redeem",
       "component": "/billingredeem/dist/redeem.html",
       "description": "Redeem coupon codes for credits",
       "category": "client",

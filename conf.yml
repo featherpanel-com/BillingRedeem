@@ -9,7 +9,7 @@ plugin:
   author:
     - NaysKutzu
     - MythicalSystems
-  icon: 'https://cdn.mythical.systems/featherpanel/logo.png'
+  icon: 'https://cdn.mythical.systems/featherpanel/paid.png'
   requiredConfigs: {  }
   dependencies:
     - php=8.5
