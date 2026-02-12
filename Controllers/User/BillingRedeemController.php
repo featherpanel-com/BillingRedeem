@@ -52,7 +52,7 @@ class BillingRedeemController
             return ApiResponse::error('Redeem system is currently disabled', 'REDEEM_DISABLED', 403);
         }
 
-        $data = json_decode($request->getContent(), true);
+        $data = json_decode($request->getContent() ?: '{}', true, 32);
         if (json_last_error() !== JSON_ERROR_NONE) {
             return ApiResponse::error('Invalid JSON in request body', 'INVALID_JSON', 400);
         }

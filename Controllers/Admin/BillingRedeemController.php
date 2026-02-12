@@ -57,7 +57,7 @@ class BillingRedeemController
     )]
     public function updateSettings(Request $request): Response
     {
-        $data = json_decode($request->getContent(), true);
+        $data = json_decode($request->getContent() ?: '{}', true, 32);
         if (json_last_error() !== JSON_ERROR_NONE) {
             return ApiResponse::error('Invalid JSON in request body', 'INVALID_JSON', 400);
         }
@@ -146,7 +146,7 @@ class BillingRedeemController
     )]
     public function createCode(Request $request): Response
     {
-        $data = json_decode($request->getContent(), true);
+        $data = json_decode($request->getContent() ?: '{}', true, 32);
         if (json_last_error() !== JSON_ERROR_NONE) {
             return ApiResponse::error('Invalid JSON in request body', 'INVALID_JSON', 400);
         }
@@ -212,7 +212,7 @@ class BillingRedeemController
             return ApiResponse::error('Code not found', 'CODE_NOT_FOUND', 404);
         }
 
-        $data = json_decode($request->getContent(), true);
+        $data = json_decode($request->getContent() ?: '{}', true, 32);
         if (json_last_error() !== JSON_ERROR_NONE) {
             return ApiResponse::error('Invalid JSON in request body', 'INVALID_JSON', 400);
         }
