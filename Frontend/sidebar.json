@@ -3,6 +3,7 @@
     "/earn/redeem": {
       "name": "Redeem Codes",
       "icon": "🎟️",
+      "lucideIcon": "ticket",
       "showBadge": false,
       "redirect": "/earn/redeem",
       "component": "/billingredeem/dist/redeem.html",
@@ -15,6 +16,7 @@
     "/billingredeem": {
       "name": "Redeem Codes",
       "icon": "🎟️",
+      "lucideIcon": "ticket",
       "showBadge": false,
       "redirect": "/billingredeem",
       "component": "/billingredeem/dist/admin.html",
