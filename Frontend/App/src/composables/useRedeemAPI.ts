@@ -5,6 +5,10 @@ import type { AxiosError } from "axios";
 export interface RedeemResponse {
   code: string;
   amount: number;
+  reward_type?: "credits" | "billing_plan_trial";
+  plan_id?: number | null;
+  free_period_days?: number | null;
+  subscription?: Record<string, unknown> | null;
   amount_formatted: string;
   new_credits: number;
   new_credits_formatted: string;

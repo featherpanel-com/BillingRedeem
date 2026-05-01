@@ -23,6 +23,7 @@ use App\Addons\billingredeem\Chat\RedeemCode;
 use Symfony\Component\HttpFoundation\Request;
 use App\Addons\billingredeem\Chat\RedeemUsage;
 use Symfony\Component\HttpFoundation\Response;
+use App\Addons\billingplans\Chat\Plan;
 use App\Addons\billingcore\Helpers\CurrencyHelper;
 use App\Addons\billingredeem\Helpers\RedeemHelper;
 
@@ -110,6 +111,21 @@ class BillingRedeemController
         ], 'Codes retrieved successfully', 200);
     }
 
+    public function getPlanOptions(Request $request): Response
+    {
+        if (!class_exists(Plan::class)) {
+            return ApiResponse::success(['plans' => []], 'Billing plans addon is not installed', 200);
+        }
+
+        $plans = array_map(static fn (array $plan): array => [
+            'id' => (int) ($plan['id'] ?? 0),
+            'name' => (string) ($plan['name'] ?? ''),
+            'billing_period_days' => (int) ($plan['billing_period_days'] ?? 30),
+        ], Plan::getAll(true));
+
+        return ApiResponse::success(['plans' => array_values($plans)], 'Plan options retrieved successfully', 200);
+    }
+
     #[OA\Get(
         path: '/api/admin/billingredeem/codes/{id}',
         summary: 'Get code by ID',
@@ -155,6 +171,14 @@ class BillingRedeemController
         $amount = isset($data['amount']) ? (int) $data['amount'] : null;
         $maxUses = isset($data['max_uses']) ? (int) $data['max_uses'] : null;
         $expiresAt = !empty($data['expires_at']) ? $data['expires_at'] : null;
+        $rewardType = in_array(($data['reward_type'] ?? 'credits'), ['credits', 'billing_plan_trial', 'billing_plan_coupon'], true)
+            ? (string) $data['reward_type']
+            : 'credits';
+        $planId = isset($data['plan_id']) ? (int) $data['plan_id'] : null;
+        $freePeriodDays = isset($data['free_period_days']) ? (int) $data['free_period_days'] : null;
+        $discountPercent = array_key_exists('discount_percent', $data) ? (float) $data['discount_percent'] : 0.0;
+        $discountCredits = array_key_exists('discount_credits', $data) ? (int) $data['discount_credits'] : 0;
+        $couponScope = isset($data['coupon_scope']) ? (string) $data['coupon_scope'] : 'initial';
 
         if (empty($code)) {
             return ApiResponse::error('Code is required', 'CODE_REQUIRED', 400);
@@ -162,6 +186,45 @@ class BillingRedeemController
 
         if ($amount === null || $amount < 0) {
             return ApiResponse::error('Amount must be a non-negative integer', 'INVALID_AMOUNT', 400);
+        }
+
+        if ($rewardType === 'billing_plan_trial') {
+            if (!class_exists(Plan::class)) {
+                return ApiResponse::error('Billing plans addon is not available', 'BILLINGPLANS_UNAVAILABLE', 400);
+            }
+            if ($planId === null || $planId < 1 || Plan::getById($planId) === null) {
+                return ApiResponse::error('Please select a valid billing plan', 'INVALID_PLAN_ID', 400);
+            }
+            if ($freePeriodDays === null || $freePeriodDays < 1) {
+                return ApiResponse::error('free_period_days must be at least 1', 'INVALID_FREE_PERIOD', 400);
+            }
+            $amount = 0;
+            $discountPercent = 0.0;
+            $discountCredits = 0;
+            $couponScope = null;
+        }
+
+        if ($rewardType === 'billing_plan_coupon') {
+            if (!class_exists(Plan::class)) {
+                return ApiResponse::error('Billing plans addon is not available', 'BILLINGPLANS_UNAVAILABLE', 400);
+            }
+            if ($planId !== null && $planId > 0 && Plan::getById($planId) === null) {
+                return ApiResponse::error('Please select a valid billing plan', 'INVALID_PLAN_ID', 400);
+            }
+            if ($discountPercent < 0 || $discountPercent > 100) {
+                return ApiResponse::error('discount_percent must be between 0 and 100', 'INVALID_DISCOUNT_PERCENT', 400);
+            }
+            if ($discountCredits < 0) {
+                return ApiResponse::error('discount_credits must be >= 0', 'INVALID_DISCOUNT_CREDITS', 400);
+            }
+            if ($discountPercent <= 0 && $discountCredits <= 0) {
+                return ApiResponse::error('Set discount_percent or discount_credits for coupon codes', 'MISSING_DISCOUNT', 400);
+            }
+            if (!in_array($couponScope, ['initial', 'renewal', 'both'], true)) {
+                return ApiResponse::error('coupon_scope must be initial, renewal, or both', 'INVALID_COUPON_SCOPE', 400);
+            }
+            $amount = 0;
+            $freePeriodDays = null;
         }
 
         // Check if code already exists
@@ -181,6 +244,12 @@ class BillingRedeemController
             'amount' => $amount,
             'max_uses' => $maxUses,
             'expires_at' => $expiresAt,
+            'reward_type' => $rewardType,
+            'plan_id' => $rewardType === 'billing_plan_trial' ? $planId : null,
+            'free_period_days' => $rewardType === 'billing_plan_trial' ? $freePeriodDays : null,
+            'discount_percent' => $rewardType === 'billing_plan_coupon' ? $discountPercent : null,
+            'discount_credits' => $rewardType === 'billing_plan_coupon' ? $discountCredits : null,
+            'coupon_scope' => $rewardType === 'billing_plan_coupon' ? $couponScope : null,
         ];
 
         $created = RedeemCode::create($codeData);
@@ -223,6 +292,53 @@ class BillingRedeemController
             if ($existing) {
                 return ApiResponse::error('Code already exists', 'CODE_EXISTS', 400);
             }
+        }
+
+        $effectiveRewardType = isset($data['reward_type']) && in_array($data['reward_type'], ['credits', 'billing_plan_trial', 'billing_plan_coupon'], true)
+            ? $data['reward_type']
+            : ((in_array(($code['reward_type'] ?? 'credits'), ['credits', 'billing_plan_trial', 'billing_plan_coupon'], true)) ? $code['reward_type'] : 'credits');
+        $effectivePlanId = array_key_exists('plan_id', $data) ? (int) ($data['plan_id'] ?? 0) : (int) ($code['plan_id'] ?? 0);
+        $effectiveFreeDays = array_key_exists('free_period_days', $data) ? (int) ($data['free_period_days'] ?? 0) : (int) ($code['free_period_days'] ?? 0);
+        $effectiveDiscountPercent = array_key_exists('discount_percent', $data) ? (float) ($data['discount_percent'] ?? 0) : (float) ($code['discount_percent'] ?? 0);
+        $effectiveDiscountCredits = array_key_exists('discount_credits', $data) ? (int) ($data['discount_credits'] ?? 0) : (int) ($code['discount_credits'] ?? 0);
+        $effectiveCouponScope = array_key_exists('coupon_scope', $data) ? (string) ($data['coupon_scope'] ?? '') : (string) ($code['coupon_scope'] ?? '');
+        if ($effectiveRewardType === 'billing_plan_trial') {
+            if (!class_exists(Plan::class)) {
+                return ApiResponse::error('Billing plans addon is not available', 'BILLINGPLANS_UNAVAILABLE', 400);
+            }
+            if ($effectivePlanId < 1 || Plan::getById($effectivePlanId) === null) {
+                return ApiResponse::error('Please select a valid billing plan', 'INVALID_PLAN_ID', 400);
+            }
+            if ($effectiveFreeDays < 1) {
+                return ApiResponse::error('free_period_days must be at least 1', 'INVALID_FREE_PERIOD', 400);
+            }
+            $data['amount'] = 0;
+            $data['discount_percent'] = null;
+            $data['discount_credits'] = null;
+            $data['coupon_scope'] = null;
+        } elseif ($effectiveRewardType === 'billing_plan_coupon') {
+            if (!class_exists(Plan::class)) {
+                return ApiResponse::error('Billing plans addon is not available', 'BILLINGPLANS_UNAVAILABLE', 400);
+            }
+            if ($effectivePlanId > 0 && Plan::getById($effectivePlanId) === null) {
+                return ApiResponse::error('Please select a valid billing plan', 'INVALID_PLAN_ID', 400);
+            }
+            if ($effectiveDiscountPercent < 0 || $effectiveDiscountPercent > 100) {
+                return ApiResponse::error('discount_percent must be between 0 and 100', 'INVALID_DISCOUNT_PERCENT', 400);
+            }
+            if ($effectiveDiscountCredits < 0) {
+                return ApiResponse::error('discount_credits must be >= 0', 'INVALID_DISCOUNT_CREDITS', 400);
+            }
+            if ($effectiveDiscountPercent <= 0 && $effectiveDiscountCredits <= 0) {
+                return ApiResponse::error('Set discount_percent or discount_credits for coupon codes', 'MISSING_DISCOUNT', 400);
+            }
+            if (!in_array($effectiveCouponScope, ['initial', 'renewal', 'both'], true)) {
+                return ApiResponse::error('coupon_scope must be initial, renewal, or both', 'INVALID_COUPON_SCOPE', 400);
+            }
+            $data['amount'] = 0;
+            $data['free_period_days'] = null;
+        } elseif (isset($data['amount']) && (int) $data['amount'] < 0) {
+            return ApiResponse::error('Amount must be a non-negative integer', 'INVALID_AMOUNT', 400);
         }
 
         $updated = RedeemCode::update($id, $data);

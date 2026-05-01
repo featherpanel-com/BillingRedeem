@@ -12,6 +12,12 @@ export interface RedeemCode {
   id: number;
   code: string;
   amount: number;
+  reward_type?: "credits" | "billing_plan_trial" | "billing_plan_coupon";
+  plan_id?: number | null;
+  free_period_days?: number | null;
+  discount_percent?: number | null;
+  discount_credits?: number | null;
+  coupon_scope?: "initial" | "renewal" | "both" | null;
   uses: number;
   max_uses: number;
   expires_at: string | null;
@@ -45,6 +51,12 @@ export interface RedeemCodeUsageResponse {
   total: number;
   limit: number;
   offset: number;
+}
+
+export interface BillingPlanOption {
+  id: number;
+  name: string;
+  billing_period_days: number;
 }
 
 export function useRedeemAdminAPI() {
@@ -133,6 +145,25 @@ export function useRedeemAdminAPI() {
         return response.data.data;
       }
       throw new Error("Failed to fetch codes");
+    } catch (err) {
+      const errorMsg = handleError(err);
+      error.value = errorMsg;
+      throw new Error(errorMsg);
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  const getPlanOptions = async (): Promise<{ plans: BillingPlanOption[] }> => {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const response = await axios.get("/api/admin/billingredeem/plan-options");
+      if (response.data && response.data.success) {
+        return response.data.data;
+      }
+      throw new Error("Failed to fetch billing plan options");
     } catch (err) {
       const errorMsg = handleError(err);
       error.value = errorMsg;
@@ -269,6 +300,7 @@ export function useRedeemAdminAPI() {
     getSettings,
     updateSettings,
     getCodes,
+    getPlanOptions,
     getCode,
     createCode,
     updateCode,

@@ -130,14 +130,20 @@ class RedeemCode
 
         try {
             $stmt = $pdo->prepare(
-                'INSERT INTO ' . self::$table . ' (code, amount, max_uses, expires_at) 
-                VALUES (:code, :amount, :max_uses, :expires_at)'
+                'INSERT INTO ' . self::$table . ' (code, amount, max_uses, expires_at, reward_type, plan_id, free_period_days, discount_percent, discount_credits, coupon_scope) 
+                VALUES (:code, :amount, :max_uses, :expires_at, :reward_type, :plan_id, :free_period_days, :discount_percent, :discount_credits, :coupon_scope)'
             );
             $stmt->execute([
                 'code' => $data['code'],
                 'amount' => (int) $data['amount'],
                 'max_uses' => isset($data['max_uses']) ? (int) $data['max_uses'] : 1,
                 'expires_at' => !empty($data['expires_at']) ? $data['expires_at'] : null,
+                'reward_type' => self::normalizeRewardType($data['reward_type'] ?? 'credits'),
+                'plan_id' => isset($data['plan_id']) && (int) $data['plan_id'] > 0 ? (int) $data['plan_id'] : null,
+                'free_period_days' => isset($data['free_period_days']) && (int) $data['free_period_days'] > 0 ? (int) $data['free_period_days'] : null,
+                'discount_percent' => isset($data['discount_percent']) ? self::normalizePercent($data['discount_percent']) : null,
+                'discount_credits' => isset($data['discount_credits']) ? max(0, (int) $data['discount_credits']) : null,
+                'coupon_scope' => self::normalizeCouponScope($data['coupon_scope'] ?? null),
             ]);
 
             return self::getById((int) $pdo->lastInsertId());
@@ -176,6 +182,30 @@ class RedeemCode
         if (isset($data['expires_at'])) {
             $updates[] = 'expires_at = :expires_at';
             $params['expires_at'] = !empty($data['expires_at']) ? $data['expires_at'] : null;
+        }
+        if (isset($data['reward_type'])) {
+            $updates[] = 'reward_type = :reward_type';
+            $params['reward_type'] = self::normalizeRewardType($data['reward_type']);
+        }
+        if (array_key_exists('plan_id', $data)) {
+            $updates[] = 'plan_id = :plan_id';
+            $params['plan_id'] = isset($data['plan_id']) && (int) $data['plan_id'] > 0 ? (int) $data['plan_id'] : null;
+        }
+        if (array_key_exists('free_period_days', $data)) {
+            $updates[] = 'free_period_days = :free_period_days';
+            $params['free_period_days'] = isset($data['free_period_days']) && (int) $data['free_period_days'] > 0 ? (int) $data['free_period_days'] : null;
+        }
+        if (array_key_exists('discount_percent', $data)) {
+            $updates[] = 'discount_percent = :discount_percent';
+            $params['discount_percent'] = $data['discount_percent'] !== null ? self::normalizePercent($data['discount_percent']) : null;
+        }
+        if (array_key_exists('discount_credits', $data)) {
+            $updates[] = 'discount_credits = :discount_credits';
+            $params['discount_credits'] = $data['discount_credits'] !== null ? max(0, (int) $data['discount_credits']) : null;
+        }
+        if (array_key_exists('coupon_scope', $data)) {
+            $updates[] = 'coupon_scope = :coupon_scope';
+            $params['coupon_scope'] = self::normalizeCouponScope($data['coupon_scope']);
         }
 
         if (empty($updates)) {
@@ -245,5 +275,41 @@ class RedeemCode
         $result = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         return $result ? (int) $result['count'] : 0;
+    }
+
+    private static function normalizeRewardType(mixed $value): string
+    {
+        $rewardType = is_string($value) ? trim($value) : 'credits';
+
+        return match ($rewardType) {
+            'billing_plan_trial', 'billing_plan_coupon' => $rewardType,
+            default => 'credits',
+        };
+    }
+
+    private static function normalizeCouponScope(mixed $value): ?string
+    {
+        if (!is_string($value) || $value === '') {
+            return null;
+        }
+        $scope = trim($value);
+        if (!in_array($scope, ['initial', 'renewal', 'both'], true)) {
+            return null;
+        }
+
+        return $scope;
+    }
+
+    private static function normalizePercent(mixed $value): float
+    {
+        $percent = is_numeric($value) ? (float) $value : 0.0;
+        if ($percent < 0) {
+            $percent = 0.0;
+        }
+        if ($percent > 100) {
+            $percent = 100.0;
+        }
+
+        return round($percent, 2);
     }
 }

@@ -84,6 +84,17 @@ return function (RouteCollection $routes): void {
         ['GET']
     );
 
+    App::getInstance(true)->registerAdminRoute(
+        $routes,
+        'billingredeem-admin-plan-options',
+        '/api/admin/billingredeem/plan-options',
+        function (Request $request) {
+            return (new AdminController())->getPlanOptions($request);
+        },
+        Permissions::ADMIN_USERS_VIEW,
+        ['GET']
+    );
+
     // Create a new code
     App::getInstance(true)->registerAdminRoute(
         $routes,

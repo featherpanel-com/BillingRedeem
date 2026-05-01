@@ -17,6 +17,7 @@
 
 namespace App\Addons\billingredeem\Controllers\User;
 
+use App\Addons\billingplans\Controllers\User\PlansController;
 use App\Helpers\ApiResponse;
 use OpenApi\Attributes as OA;
 use App\Addons\billingredeem\Chat\RedeemCode;
@@ -119,13 +120,68 @@ class BillingRedeemController
                 return ApiResponse::error('Failed to increment code uses', 'INCREMENT_FAILED', 500);
             }
 
-            // Add credits to user
-            $amount = (int) $redeemCode['amount'];
-            $added = CreditsHelper::addUserCredits($user['id'], $amount);
-            if (!$added) {
+            $rewardType = ($redeemCode['reward_type'] ?? 'credits') === 'billing_plan_trial'
+                ? 'billing_plan_trial'
+                : 'credits';
+            if (($redeemCode['reward_type'] ?? 'credits') === 'billing_plan_coupon') {
                 $pdo->rollBack();
 
-                return ApiResponse::error('Failed to add credits', 'CREDITS_FAILED', 500);
+                return ApiResponse::error(
+                    'This is a checkout coupon code. Use it when subscribing to a billing plan.',
+                    'COUPON_CHECKOUT_ONLY',
+                    400
+                );
+            }
+            $amount = (int) $redeemCode['amount'];
+            $subscriptionPayload = null;
+            if ($rewardType === 'credits') {
+                $added = CreditsHelper::addUserCredits($user['id'], $amount);
+                if (!$added) {
+                    $pdo->rollBack();
+
+                    return ApiResponse::error('Failed to add credits', 'CREDITS_FAILED', 500);
+                }
+            } else {
+                if (!class_exists(PlansController::class)) {
+                    $pdo->rollBack();
+
+                    return ApiResponse::error('Billing plans addon is not available', 'BILLINGPLANS_UNAVAILABLE', 400);
+                }
+
+                $planId = (int) ($redeemCode['plan_id'] ?? 0);
+                $freePeriodDays = max(1, (int) ($redeemCode['free_period_days'] ?? 0));
+                if ($planId < 1 || $freePeriodDays < 1) {
+                    $pdo->rollBack();
+
+                    return ApiResponse::error('This redeem code is misconfigured.', 'CODE_MISCONFIGURED', 400);
+                }
+
+                $subscriptionRequest = Request::create(
+                    '',
+                    'POST',
+                    [],
+                    [],
+                    [],
+                    [],
+                    json_encode([])
+                );
+                $subscriptionRequest->attributes->set('user', $user);
+                $subscriptionRequest->attributes->set('_billingplans_skip_initial_charge', true);
+                $subscriptionRequest->attributes->set('_billingplans_initial_period_days', $freePeriodDays);
+                $subscriptionRequest->attributes->set('_billingplans_subscription_source', 'redeem_code:' . $code);
+
+                $subscriptionResponse = (new PlansController())->subscribe($subscriptionRequest, $planId);
+                $subscriptionResponsePayload = json_decode($subscriptionResponse->getContent(), true);
+                if (($subscriptionResponsePayload['success'] ?? false) !== true) {
+                    $pdo->rollBack();
+
+                    return ApiResponse::error(
+                        $subscriptionResponsePayload['message'] ?? 'Failed to activate plan from code',
+                        $subscriptionResponsePayload['error_code'] ?? 'PLAN_TRIAL_FAILED',
+                        (int) $subscriptionResponse->getStatusCode()
+                    );
+                }
+                $subscriptionPayload = $subscriptionResponsePayload['data'] ?? null;
             }
 
             // Get updated user credits
@@ -135,10 +191,14 @@ class BillingRedeemController
 
             return ApiResponse::success([
                 'code' => $code,
+                'reward_type' => $rewardType,
                 'amount' => $amount,
                 'amount_formatted' => CurrencyHelper::formatAmount($amount),
                 'new_credits' => $newCredits,
                 'new_credits_formatted' => CurrencyHelper::formatAmount($newCredits),
+                'plan_id' => isset($redeemCode['plan_id']) ? (int) $redeemCode['plan_id'] : null,
+                'free_period_days' => isset($redeemCode['free_period_days']) ? (int) $redeemCode['free_period_days'] : null,
+                'subscription' => $subscriptionPayload,
             ], 'Code redeemed successfully', 200);
         } catch (\Exception $e) {
             if ($pdo->inTransaction()) {

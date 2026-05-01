@@ -24,6 +24,7 @@ import {
   type RedeemSettings,
   type RedeemCode,
   type RedeemCodeUsage,
+  type BillingPlanOption,
 } from "@/composables/useRedeemAdminAPI";
 import { useToast } from "vue-toastification";
 
@@ -36,6 +37,7 @@ const {
   updateCode,
   deleteCode,
   getCodeUsage,
+  getPlanOptions,
   loading,
 } = useRedeemAdminAPI();
 
@@ -48,6 +50,7 @@ const codes = ref<RedeemCode[]>([]);
 const codesPage = ref(1);
 const codesTotal = ref(0);
 const loadingCodes = ref(false);
+const billingPlanOptions = ref<BillingPlanOption[]>([]);
 
 // Code form
 const showCodeForm = ref(false);
@@ -55,6 +58,12 @@ const editingCode = ref<RedeemCode | null>(null);
 const codeForm = ref({
   code: "",
   amount: 0,
+  reward_type: "credits" as "credits" | "billing_plan_trial" | "billing_plan_coupon",
+  plan_id: null as number | null,
+  free_period_days: 30,
+  discount_percent: 0,
+  discount_credits: 0,
+  coupon_scope: "initial" as "initial" | "renewal" | "both",
   max_uses: 1,
   expires_at: "",
 });
@@ -115,12 +124,29 @@ const loadCodes = async (page: number = 1) => {
   }
 };
 
+const loadBillingPlanOptions = async () => {
+  try {
+    const result = await getPlanOptions();
+    billingPlanOptions.value = result.plans ?? [];
+  } catch (err) {
+    toast.error(
+      err instanceof Error ? err.message : "Failed to load billing plan options"
+    );
+  }
+};
+
 const openCodeForm = (code?: RedeemCode) => {
   if (code) {
     editingCode.value = code;
     codeForm.value = {
       code: code.code,
       amount: code.amount,
+      reward_type: code.reward_type ?? "credits",
+      plan_id: code.plan_id ?? null,
+      free_period_days: code.free_period_days ?? 30,
+      discount_percent: Number(code.discount_percent ?? 0),
+      discount_credits: Number(code.discount_credits ?? 0),
+      coupon_scope: (code.coupon_scope as "initial" | "renewal" | "both" | null) ?? "initial",
       max_uses: code.max_uses,
       expires_at: code.expires_at ? code.expires_at.split(" ")[0] || "" : "",
     };
@@ -129,6 +155,12 @@ const openCodeForm = (code?: RedeemCode) => {
     codeForm.value = {
       code: "",
       amount: 0,
+      reward_type: "credits",
+      plan_id: null,
+      free_period_days: 30,
+      discount_percent: 0,
+      discount_credits: 0,
+      coupon_scope: "initial",
       max_uses: settings.value?.default_max_uses || 1,
       expires_at: "",
     };
@@ -142,6 +174,12 @@ const closeCodeForm = () => {
   codeForm.value = {
     code: "",
     amount: 0,
+    reward_type: "credits",
+    plan_id: null,
+    free_period_days: 30,
+    discount_percent: 0,
+    discount_credits: 0,
+    coupon_scope: "initial",
     max_uses: 1,
     expires_at: "",
   };
@@ -155,6 +193,39 @@ const saveCode = async () => {
   if (codeForm.value.amount < 0) {
     toast.error("Amount must be non-negative");
     return;
+  }
+  if (codeForm.value.reward_type === "billing_plan_trial") {
+    if (!codeForm.value.plan_id) {
+      toast.error("Please select a billing plan");
+      return;
+    }
+    if (!codeForm.value.free_period_days || codeForm.value.free_period_days < 1) {
+      toast.error("Free period must be at least 1 day");
+      return;
+    }
+    codeForm.value.amount = 0;
+    codeForm.value.discount_percent = 0;
+    codeForm.value.discount_credits = 0;
+  }
+  if (codeForm.value.reward_type === "billing_plan_coupon") {
+    if (codeForm.value.plan_id !== null && Number(codeForm.value.plan_id) < 1) {
+      toast.error("Please select a valid plan or clear the plan target.");
+      return;
+    }
+    if ((codeForm.value.discount_percent ?? 0) < 0 || (codeForm.value.discount_percent ?? 0) > 100) {
+      toast.error("Discount percent must be between 0 and 100.");
+      return;
+    }
+    if ((codeForm.value.discount_credits ?? 0) < 0) {
+      toast.error("Discount credits must be non-negative.");
+      return;
+    }
+    if ((codeForm.value.discount_percent ?? 0) <= 0 && (codeForm.value.discount_credits ?? 0) <= 0) {
+      toast.error("Set either discount percent or discount credits.");
+      return;
+    }
+    codeForm.value.amount = 0;
+    codeForm.value.free_period_days = 30;
   }
 
   try {
@@ -227,6 +298,7 @@ const isExpired = (code: RedeemCode): boolean => {
 };
 
 onMounted(() => {
+  loadBillingPlanOptions();
   if (activeTab.value === "codes") {
     loadCodes();
   } else if (activeTab.value === "settings") {
@@ -314,6 +386,18 @@ onMounted(() => {
                       </Badge>
                     </div>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span class="text-muted-foreground">Reward:</span>
+                        <span class="ml-2 font-medium">
+                          {{
+                            code.reward_type === "billing_plan_trial"
+                              ? `Plan trial (${code.free_period_days || 0}d)`
+                              : code.reward_type === "billing_plan_coupon"
+                                ? `Coupon (${code.coupon_scope || "initial"})`
+                                : "Credits"
+                          }}
+                        </span>
+                      </div>
                       <div>
                         <span class="text-muted-foreground">Amount:</span>
                         <span
@@ -544,6 +628,19 @@ onMounted(() => {
               </div>
 
               <div>
+                <Label for="form-reward-type">Reward Type</Label>
+                <select
+                  id="form-reward-type"
+                  v-model="codeForm.reward_type"
+                  class="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="credits">Credits</option>
+                  <option value="billing_plan_trial">Billing plan trial</option>
+                  <option value="billing_plan_coupon">Billing plan coupon</option>
+                </select>
+              </div>
+
+              <div v-if="codeForm.reward_type === 'credits'">
                 <Label for="form-amount">Amount (Credits)</Label>
                 <Input
                   id="form-amount"
@@ -553,6 +650,86 @@ onMounted(() => {
                   class="mt-2"
                   required
                 />
+              </div>
+
+              <div v-else-if="codeForm.reward_type === 'billing_plan_trial'" class="space-y-4">
+                <div>
+                  <Label for="form-plan-id">Billing Plan</Label>
+                  <select
+                    id="form-plan-id"
+                    v-model.number="codeForm.plan_id"
+                    class="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    required
+                  >
+                    <option :value="null">Select a plan...</option>
+                    <option v-for="plan in billingPlanOptions" :key="plan.id" :value="plan.id">
+                      {{ plan.name }} ({{ plan.billing_period_days }}d cycle)
+                    </option>
+                  </select>
+                </div>
+                <div>
+                  <Label for="form-free-period-days">Free Period (Days)</Label>
+                  <Input
+                    id="form-free-period-days"
+                    v-model.number="codeForm.free_period_days"
+                    type="number"
+                    min="1"
+                    class="mt-2"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div v-if="codeForm.reward_type === 'billing_plan_coupon'" class="space-y-4">
+                <div>
+                  <Label for="form-coupon-plan-id">Target Plan (optional)</Label>
+                  <select
+                    id="form-coupon-plan-id"
+                    v-model.number="codeForm.plan_id"
+                    class="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option :value="null">Any billing plan</option>
+                    <option v-for="plan in billingPlanOptions" :key="plan.id" :value="plan.id">
+                      {{ plan.name }} ({{ plan.billing_period_days }}d cycle)
+                    </option>
+                  </select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label for="form-discount-percent">Discount %</Label>
+                    <Input
+                      id="form-discount-percent"
+                      v-model.number="codeForm.discount_percent"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      class="mt-2"
+                    />
+                  </div>
+                  <div>
+                    <Label for="form-discount-credits">Discount Credits</Label>
+                    <Input
+                      id="form-discount-credits"
+                      v-model.number="codeForm.discount_credits"
+                      type="number"
+                      min="0"
+                      class="mt-2"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label for="form-coupon-scope">Applies To</Label>
+                  <select
+                    id="form-coupon-scope"
+                    v-model="codeForm.coupon_scope"
+                    class="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="initial">First purchase only</option>
+                    <option value="renewal">Renewals only</option>
+                    <option value="both">First purchase and renewals</option>
+                  </select>
+                </div>
               </div>
 
               <div>

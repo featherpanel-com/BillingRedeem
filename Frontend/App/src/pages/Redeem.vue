@@ -45,9 +45,15 @@ const handleRedeem = async () => {
   redeeming.value = true;
   try {
     const result = await redeem(code);
-    toast.success(
-      `Successfully redeemed ${result.amount_formatted}! Your new balance is ${result.new_credits_formatted}`
-    );
+    if (result.reward_type === "billing_plan_trial") {
+      toast.success(
+        `Trial activated for ${result.free_period_days || 0} day(s). Billing will start after the trial period.`
+      );
+    } else {
+      toast.success(
+        `Successfully redeemed ${result.amount_formatted}! Your new balance is ${result.new_credits_formatted}`
+      );
+    }
     codeInput.value = "";
     // Refresh history
     if (showHistory.value) {
