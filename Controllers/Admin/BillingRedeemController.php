@@ -19,11 +19,11 @@ namespace App\Addons\billingredeem\Controllers\Admin;
 
 use App\Helpers\ApiResponse;
 use OpenApi\Attributes as OA;
+use App\Addons\billingplans\Chat\Plan;
 use App\Addons\billingredeem\Chat\RedeemCode;
 use Symfony\Component\HttpFoundation\Request;
 use App\Addons\billingredeem\Chat\RedeemUsage;
 use Symfony\Component\HttpFoundation\Response;
-use App\Addons\billingplans\Chat\Plan;
 use App\Addons\billingcore\Helpers\CurrencyHelper;
 use App\Addons\billingredeem\Helpers\RedeemHelper;
 
@@ -171,7 +171,7 @@ class BillingRedeemController
         $amount = isset($data['amount']) ? (int) $data['amount'] : null;
         $maxUses = isset($data['max_uses']) ? (int) $data['max_uses'] : null;
         $expiresAt = !empty($data['expires_at']) ? $data['expires_at'] : null;
-        $rewardType = in_array(($data['reward_type'] ?? 'credits'), ['credits', 'billing_plan_trial', 'billing_plan_coupon'], true)
+        $rewardType = in_array($data['reward_type'] ?? 'credits', ['credits', 'billing_plan_trial', 'billing_plan_coupon'], true)
             ? (string) $data['reward_type']
             : 'credits';
         $planId = isset($data['plan_id']) ? (int) $data['plan_id'] : null;
@@ -296,7 +296,7 @@ class BillingRedeemController
 
         $effectiveRewardType = isset($data['reward_type']) && in_array($data['reward_type'], ['credits', 'billing_plan_trial', 'billing_plan_coupon'], true)
             ? $data['reward_type']
-            : ((in_array(($code['reward_type'] ?? 'credits'), ['credits', 'billing_plan_trial', 'billing_plan_coupon'], true)) ? $code['reward_type'] : 'credits');
+            : ((in_array($code['reward_type'] ?? 'credits', ['credits', 'billing_plan_trial', 'billing_plan_coupon'], true)) ? $code['reward_type'] : 'credits');
         $effectivePlanId = array_key_exists('plan_id', $data) ? (int) ($data['plan_id'] ?? 0) : (int) ($code['plan_id'] ?? 0);
         $effectiveFreeDays = array_key_exists('free_period_days', $data) ? (int) ($data['free_period_days'] ?? 0) : (int) ($code['free_period_days'] ?? 0);
         $effectiveDiscountPercent = array_key_exists('discount_percent', $data) ? (float) ($data['discount_percent'] ?? 0) : (float) ($code['discount_percent'] ?? 0);

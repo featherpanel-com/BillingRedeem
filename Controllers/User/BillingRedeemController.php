@@ -17,7 +17,6 @@
 
 namespace App\Addons\billingredeem\Controllers\User;
 
-use App\Addons\billingplans\Controllers\User\PlansController;
 use App\Helpers\ApiResponse;
 use OpenApi\Attributes as OA;
 use App\Addons\billingredeem\Chat\RedeemCode;
@@ -27,6 +26,7 @@ use Symfony\Component\HttpFoundation\Response;
 use App\Addons\billingcore\Helpers\CreditsHelper;
 use App\Addons\billingcore\Helpers\CurrencyHelper;
 use App\Addons\billingredeem\Helpers\RedeemHelper;
+use App\Addons\billingplans\Controllers\User\PlansController;
 
 #[OA\Tag(name: 'User - Billing Redeem', description: 'Redeem codes management for users')]
 class BillingRedeemController

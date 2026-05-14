@@ -34,7 +34,7 @@ class RedeemHelper
         return [
             'is_enabled' => self::getSetting('is_enabled') === '1' || self::getSetting('is_enabled') === 'true',
             'allow_multiple_uses' => self::getSetting('allow_multiple_uses') === '1' || self::getSetting('allow_multiple_uses') === 'true',
-            'default_max_uses' => self::getSetting('default_max_uses') ? (int) self::getSetting('default_max_uses') : 1,
+            'default_max_uses' => self::defaultMaxUsesFromStored(),
         ];
     }
 
@@ -65,6 +65,19 @@ class RedeemHelper
     public static function isEnabled(): bool
     {
         return self::getSetting('is_enabled') === '1' || self::getSetting('is_enabled') === 'true';
+    }
+
+    /**
+     * Default max uses from storage; 0 means unlimited. Missing / empty falls back to 1.
+     */
+    private static function defaultMaxUsesFromStored(): int
+    {
+        $raw = self::getSetting('default_max_uses');
+        if ($raw === null || $raw === '') {
+            return 1;
+        }
+
+        return (int) $raw;
     }
 
     /**

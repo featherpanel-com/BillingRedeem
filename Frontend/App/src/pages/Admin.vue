@@ -161,7 +161,7 @@ const openCodeForm = (code?: RedeemCode) => {
       discount_percent: 0,
       discount_credits: 0,
       coupon_scope: "initial",
-      max_uses: settings.value?.default_max_uses || 1,
+      max_uses: settings.value?.default_max_uses ?? 1,
       expires_at: "",
     };
   }
@@ -573,7 +573,7 @@ onMounted(() => {
                     id="default_max_uses"
                     v-model.number="settings.default_max_uses"
                     type="number"
-                    min="1"
+                    min="0"
                     class="mt-2"
                   />
                   <p class="text-sm text-muted-foreground mt-1">
