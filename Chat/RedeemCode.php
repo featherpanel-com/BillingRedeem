@@ -28,7 +28,50 @@ class RedeemCode
     private static string $table = 'featherpanel_billingredeem_codes';
 
     /**
-     * Get a code by its code string.
+     * Get codes with pagination, optionally filtered by reward type and search.
+     *
+     * @return array{data: list<array<string, mixed>>, total: int}
+     */
+    public static function getPaginatedByRewardType(
+        string $rewardType,
+        int $page = 1,
+        int $limit = 20,
+        string $search = '',
+    ): array {
+        $page = max(1, $page);
+        $limit = max(1, min(100, $limit));
+        $offset = ($page - 1) * $limit;
+        $pdo = Database::getPdoConnection();
+        $where = 'reward_type = :reward_type';
+        $params = ['reward_type' => $rewardType];
+
+        if ($search !== '') {
+            $where .= ' AND code LIKE :search';
+            $params['search'] = '%' . strtoupper(trim($search)) . '%';
+        }
+
+        $countStmt = $pdo->prepare('SELECT COUNT(*) AS count FROM ' . self::$table . ' WHERE ' . $where);
+        $countStmt->execute($params);
+        $total = (int) ($countStmt->fetch(\PDO::FETCH_ASSOC)['count'] ?? 0);
+
+        $stmt = $pdo->prepare(
+            'SELECT * FROM ' . self::$table . ' WHERE ' . $where . ' ORDER BY created_at DESC LIMIT :limit OFFSET :offset',
+        );
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(':' . $key, $value);
+        }
+        $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+        $stmt->execute();
+
+        return [
+            'data' => $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [],
+            'total' => $total,
+        ];
+    }
+
+    /**
+     * Get a code by its code string (case-insensitive).
      */
     public static function getByCode(string $code): ?array
     {
@@ -37,8 +80,8 @@ class RedeemCode
         }
 
         $pdo = Database::getPdoConnection();
-        $stmt = $pdo->prepare('SELECT * FROM ' . self::$table . ' WHERE code = :code LIMIT 1');
-        $stmt->execute(['code' => $code]);
+        $stmt = $pdo->prepare('SELECT * FROM ' . self::$table . ' WHERE UPPER(code) = UPPER(:code) LIMIT 1');
+        $stmt->execute(['code' => trim($code)]);
         $result = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         return $result !== false ? $result : null;
@@ -134,7 +177,7 @@ class RedeemCode
                 VALUES (:code, :amount, :max_uses, :expires_at, :reward_type, :plan_id, :free_period_days, :discount_percent, :discount_credits, :coupon_scope)'
             );
             $stmt->execute([
-                'code' => $data['code'],
+                'code' => strtoupper(trim((string) $data['code'])),
                 'amount' => (int) $data['amount'],
                 'max_uses' => isset($data['max_uses']) ? (int) $data['max_uses'] : 1,
                 'expires_at' => !empty($data['expires_at']) ? $data['expires_at'] : null,
@@ -169,7 +212,7 @@ class RedeemCode
 
         if (isset($data['code'])) {
             $updates[] = 'code = :code';
-            $params['code'] = $data['code'];
+            $params['code'] = strtoupper(trim((string) $data['code']));
         }
         if (isset($data['amount'])) {
             $updates[] = 'amount = :amount';

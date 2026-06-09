@@ -167,7 +167,7 @@ class BillingRedeemController
             return ApiResponse::error('Invalid JSON in request body', 'INVALID_JSON', 400);
         }
 
-        $code = trim($data['code'] ?? '');
+        $code = strtoupper(trim($data['code'] ?? ''));
         $amount = isset($data['amount']) ? (int) $data['amount'] : null;
         $maxUses = isset($data['max_uses']) ? (int) $data['max_uses'] : null;
         $expiresAt = !empty($data['expires_at']) ? $data['expires_at'] : null;
@@ -245,7 +245,11 @@ class BillingRedeemController
             'max_uses' => $maxUses,
             'expires_at' => $expiresAt,
             'reward_type' => $rewardType,
-            'plan_id' => $rewardType === 'billing_plan_trial' ? $planId : null,
+            'plan_id' => match ($rewardType) {
+                'billing_plan_trial' => $planId,
+                'billing_plan_coupon' => ($planId !== null && $planId > 0) ? $planId : null,
+                default => null,
+            },
             'free_period_days' => $rewardType === 'billing_plan_trial' ? $freePeriodDays : null,
             'discount_percent' => $rewardType === 'billing_plan_coupon' ? $discountPercent : null,
             'discount_credits' => $rewardType === 'billing_plan_coupon' ? $discountCredits : null,
