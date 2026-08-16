@@ -13,7 +13,7 @@ import {
   AlertCircle,
   Sparkles,
   TrendingUp,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 import {
   useRedeemAPI,
   type RedeemHistoryItem,

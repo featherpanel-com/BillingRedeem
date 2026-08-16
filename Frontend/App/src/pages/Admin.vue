@@ -16,9 +16,10 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
+  ArrowLeft,
   Users,
   X,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 import {
   useRedeemAdminAPI,
   type RedeemSettings,
@@ -310,6 +311,260 @@ onMounted(() => {
 <template>
   <div class="w-full h-full overflow-auto p-4 md:p-8 min-h-screen">
     <div class="container mx-auto max-w-6xl">
+      <!-- Create / Edit code page -->
+      <template v-if="showCodeForm">
+        <div class="mb-6 flex items-center gap-3">
+          <Button variant="outline" size="icon" @click="closeCodeForm">
+            <ArrowLeft class="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 class="text-2xl font-semibold">
+              {{ editingCode ? "Edit Code" : "Create Code" }}
+            </h1>
+            <p class="text-sm text-muted-foreground">
+              {{
+                editingCode
+                  ? "Update redemption code settings"
+                  : "Create a new redemption code"
+              }}
+            </p>
+          </div>
+        </div>
+
+        <Card class="p-6 border-2 shadow-xl bg-card/50 backdrop-blur-sm">
+          <form @submit.prevent="saveCode" class="space-y-4">
+            <div>
+              <Label for="form-code">Code</Label>
+              <Input
+                id="form-code"
+                v-model="codeForm.code"
+                type="text"
+                placeholder="REDEEM123"
+                class="mt-2 uppercase"
+                required
+              />
+            </div>
+
+            <div>
+              <Label for="form-reward-type">Reward Type</Label>
+              <select
+                id="form-reward-type"
+                v-model="codeForm.reward_type"
+                class="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="credits">Credits</option>
+                <option value="billing_plan_trial">Billing plan trial</option>
+                <option value="billing_plan_coupon">Billing plan coupon</option>
+              </select>
+            </div>
+
+            <div v-if="codeForm.reward_type === 'credits'">
+              <Label for="form-amount">Amount (Credits)</Label>
+              <Input
+                id="form-amount"
+                v-model.number="codeForm.amount"
+                type="number"
+                min="0"
+                class="mt-2"
+                required
+              />
+            </div>
+
+            <div v-else-if="codeForm.reward_type === 'billing_plan_trial'" class="space-y-4">
+              <div>
+                <Label for="form-plan-id">Billing Plan</Label>
+                <select
+                  id="form-plan-id"
+                  v-model.number="codeForm.plan_id"
+                  class="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  required
+                >
+                  <option :value="null">Select a plan...</option>
+                  <option v-for="plan in billingPlanOptions" :key="plan.id" :value="plan.id">
+                    {{ plan.name }} ({{ plan.billing_period_days }}d cycle)
+                  </option>
+                </select>
+              </div>
+              <div>
+                <Label for="form-free-period-days">Free Period (Days)</Label>
+                <Input
+                  id="form-free-period-days"
+                  v-model.number="codeForm.free_period_days"
+                  type="number"
+                  min="1"
+                  class="mt-2"
+                  required
+                />
+              </div>
+            </div>
+
+            <div v-if="codeForm.reward_type === 'billing_plan_coupon'" class="space-y-4">
+              <div>
+                <Label for="form-coupon-plan-id">Target Plan (optional)</Label>
+                <select
+                  id="form-coupon-plan-id"
+                  v-model.number="codeForm.plan_id"
+                  class="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option :value="null">Any billing plan</option>
+                  <option v-for="plan in billingPlanOptions" :key="plan.id" :value="plan.id">
+                    {{ plan.name }} ({{ plan.billing_period_days }}d cycle)
+                  </option>
+                </select>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <Label for="form-discount-percent">Discount %</Label>
+                  <Input
+                    id="form-discount-percent"
+                    v-model.number="codeForm.discount_percent"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    class="mt-2"
+                  />
+                </div>
+                <div>
+                  <Label for="form-discount-credits">Discount Credits</Label>
+                  <Input
+                    id="form-discount-credits"
+                    v-model.number="codeForm.discount_credits"
+                    type="number"
+                    min="0"
+                    class="mt-2"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label for="form-coupon-scope">Applies To</Label>
+                <select
+                  id="form-coupon-scope"
+                  v-model="codeForm.coupon_scope"
+                  class="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="initial">First purchase only</option>
+                  <option value="renewal">Renewals only</option>
+                  <option value="both">First purchase and renewals</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <Label for="form-max-uses">Max Uses</Label>
+              <Input
+                id="form-max-uses"
+                v-model.number="codeForm.max_uses"
+                type="number"
+                min="0"
+                class="mt-2"
+                required
+              />
+              <p class="text-sm text-muted-foreground mt-1">
+                0 = unlimited uses
+              </p>
+            </div>
+
+            <div>
+              <Label for="form-expires">Expires At (Optional)</Label>
+              <Input
+                id="form-expires"
+                v-model="codeForm.expires_at"
+                type="date"
+                class="mt-2"
+              />
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4 border-t">
+              <Button type="button" @click="closeCodeForm" variant="outline">
+                Cancel
+              </Button>
+              <Button type="submit">
+                <Save class="h-4 w-4 mr-2" />
+                {{ editingCode ? "Update" : "Create" }}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      </template>
+
+      <!-- Code usage page -->
+      <template v-else-if="showUsage && selectedCode">
+        <div class="mb-6 flex items-center gap-3">
+          <Button variant="outline" size="icon" @click="showUsage = false">
+            <ArrowLeft class="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 class="text-2xl font-semibold">Code Usage</h1>
+            <p class="text-sm text-muted-foreground">
+              {{ selectedCode.code }}
+            </p>
+          </div>
+        </div>
+
+        <Card class="p-6 border-2 shadow-xl bg-card/50 backdrop-blur-sm">
+          <div
+            v-if="loadingUsage && codeUsage.length === 0"
+            class="flex items-center justify-center py-12"
+          >
+            <Loader2 class="h-8 w-8 animate-spin" />
+          </div>
+          <div
+            v-else-if="codeUsage.length === 0"
+            class="text-center py-12 text-muted-foreground"
+          >
+            No usage found for this code
+          </div>
+          <div v-else class="space-y-2">
+            <div
+              v-for="usage in codeUsage"
+              :key="usage.id"
+              class="flex items-center justify-between p-4 border rounded-lg"
+            >
+              <div>
+                <div class="font-medium">
+                  {{
+                    usage.username || usage.email || `User #${usage.user_id}`
+                  }}
+                </div>
+                <div class="text-sm text-muted-foreground">
+                  {{ formatDate(usage.used_at) }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-if="Math.ceil(usageTotal / 20) > 1"
+            class="flex items-center justify-center gap-2 mt-6"
+          >
+            <Button
+              @click="loadCodeUsage(selectedCode.id, usagePage - 1)"
+              :disabled="usagePage === 1"
+              variant="outline"
+              size="sm"
+            >
+              <ChevronLeft class="h-4 w-4" />
+            </Button>
+            <span class="text-sm text-muted-foreground">
+              Page {{ usagePage }} of {{ Math.ceil(usageTotal / 20) }} ({{
+                usageTotal
+              }}
+              total)
+            </span>
+            <Button
+              @click="loadCodeUsage(selectedCode.id, usagePage + 1)"
+              :disabled="usagePage >= Math.ceil(usageTotal / 20)"
+              variant="outline"
+              size="sm"
+            >
+              <ChevronRight class="h-4 w-4" />
+            </Button>
+          </div>
+        </Card>
+      </template>
+
+      <template v-else>
       <div class="mb-6 text-center md:text-left">
         <h1
           class="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent"
@@ -596,263 +851,7 @@ onMounted(() => {
           </Card>
         </TabsContent>
       </Tabs>
-
-      <!-- Code Form Modal -->
-      <div
-        v-if="showCodeForm"
-        class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-        @click.self="closeCodeForm"
-      >
-        <Card class="w-full max-w-md m-4 border-2 shadow-xl bg-card/50 backdrop-blur-sm">
-          <div class="p-6">
-            <div class="flex items-center justify-between mb-4">
-              <h3 class="text-lg font-semibold">
-                {{ editingCode ? "Edit Code" : "Create Code" }}
-              </h3>
-              <Button @click="closeCodeForm" variant="ghost" size="sm">
-                <X class="h-4 w-4" />
-              </Button>
-            </div>
-
-            <form @submit.prevent="saveCode" class="space-y-4">
-              <div>
-                <Label for="form-code">Code</Label>
-                <Input
-                  id="form-code"
-                  v-model="codeForm.code"
-                  type="text"
-                  placeholder="REDEEM123"
-                  class="mt-2 uppercase"
-                  required
-                />
-              </div>
-
-              <div>
-                <Label for="form-reward-type">Reward Type</Label>
-                <select
-                  id="form-reward-type"
-                  v-model="codeForm.reward_type"
-                  class="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  <option value="credits">Credits</option>
-                  <option value="billing_plan_trial">Billing plan trial</option>
-                  <option value="billing_plan_coupon">Billing plan coupon</option>
-                </select>
-              </div>
-
-              <div v-if="codeForm.reward_type === 'credits'">
-                <Label for="form-amount">Amount (Credits)</Label>
-                <Input
-                  id="form-amount"
-                  v-model.number="codeForm.amount"
-                  type="number"
-                  min="0"
-                  class="mt-2"
-                  required
-                />
-              </div>
-
-              <div v-else-if="codeForm.reward_type === 'billing_plan_trial'" class="space-y-4">
-                <div>
-                  <Label for="form-plan-id">Billing Plan</Label>
-                  <select
-                    id="form-plan-id"
-                    v-model.number="codeForm.plan_id"
-                    class="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    required
-                  >
-                    <option :value="null">Select a plan...</option>
-                    <option v-for="plan in billingPlanOptions" :key="plan.id" :value="plan.id">
-                      {{ plan.name }} ({{ plan.billing_period_days }}d cycle)
-                    </option>
-                  </select>
-                </div>
-                <div>
-                  <Label for="form-free-period-days">Free Period (Days)</Label>
-                  <Input
-                    id="form-free-period-days"
-                    v-model.number="codeForm.free_period_days"
-                    type="number"
-                    min="1"
-                    class="mt-2"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div v-if="codeForm.reward_type === 'billing_plan_coupon'" class="space-y-4">
-                <div>
-                  <Label for="form-coupon-plan-id">Target Plan (optional)</Label>
-                  <select
-                    id="form-coupon-plan-id"
-                    v-model.number="codeForm.plan_id"
-                    class="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    <option :value="null">Any billing plan</option>
-                    <option v-for="plan in billingPlanOptions" :key="plan.id" :value="plan.id">
-                      {{ plan.name }} ({{ plan.billing_period_days }}d cycle)
-                    </option>
-                  </select>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label for="form-discount-percent">Discount %</Label>
-                    <Input
-                      id="form-discount-percent"
-                      v-model.number="codeForm.discount_percent"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      class="mt-2"
-                    />
-                  </div>
-                  <div>
-                    <Label for="form-discount-credits">Discount Credits</Label>
-                    <Input
-                      id="form-discount-credits"
-                      v-model.number="codeForm.discount_credits"
-                      type="number"
-                      min="0"
-                      class="mt-2"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label for="form-coupon-scope">Applies To</Label>
-                  <select
-                    id="form-coupon-scope"
-                    v-model="codeForm.coupon_scope"
-                    class="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    <option value="initial">First purchase only</option>
-                    <option value="renewal">Renewals only</option>
-                    <option value="both">First purchase and renewals</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <Label for="form-max-uses">Max Uses</Label>
-                <Input
-                  id="form-max-uses"
-                  v-model.number="codeForm.max_uses"
-                  type="number"
-                  min="0"
-                  class="mt-2"
-                  required
-                />
-                <p class="text-sm text-muted-foreground mt-1">
-                  0 = unlimited uses
-                </p>
-              </div>
-
-              <div>
-                <Label for="form-expires">Expires At (Optional)</Label>
-                <Input
-                  id="form-expires"
-                  v-model="codeForm.expires_at"
-                  type="date"
-                  class="mt-2"
-                />
-              </div>
-
-              <div class="flex justify-end gap-2 pt-4">
-                <Button type="button" @click="closeCodeForm" variant="outline">
-                  Cancel
-                </Button>
-                <Button type="submit">
-                  <Save class="h-4 w-4 mr-2" />
-                  {{ editingCode ? "Update" : "Create" }}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </Card>
-      </div>
-
-      <!-- Code Usage Modal -->
-      <div
-        v-if="showUsage && selectedCode"
-        class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-        @click.self="showUsage = false"
-      >
-        <Card class="w-full max-w-2xl m-4 max-h-[80vh] overflow-auto border-2 shadow-xl bg-card/50 backdrop-blur-sm">
-          <div class="p-6">
-            <div class="flex items-center justify-between mb-4">
-              <div>
-                <h3 class="text-lg font-semibold">Code Usage</h3>
-                <p class="text-sm text-muted-foreground">
-                  {{ selectedCode.code }}
-                </p>
-              </div>
-              <Button @click="showUsage = false" variant="ghost" size="sm">
-                <X class="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div
-              v-if="loadingUsage && codeUsage.length === 0"
-              class="flex items-center justify-center py-12"
-            >
-              <Loader2 class="h-8 w-8 animate-spin" />
-            </div>
-            <div
-              v-else-if="codeUsage.length === 0"
-              class="text-center py-12 text-muted-foreground"
-            >
-              No usage found for this code
-            </div>
-            <div v-else class="space-y-2">
-              <div
-                v-for="usage in codeUsage"
-                :key="usage.id"
-                class="flex items-center justify-between p-4 border rounded-lg"
-              >
-                <div>
-                  <div class="font-medium">
-                    {{
-                      usage.username || usage.email || `User #${usage.user_id}`
-                    }}
-                  </div>
-                  <div class="text-sm text-muted-foreground">
-                    {{ formatDate(usage.used_at) }}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Pagination -->
-            <div
-              v-if="Math.ceil(usageTotal / 20) > 1"
-              class="flex items-center justify-center gap-2 mt-6"
-            >
-              <Button
-                @click="loadCodeUsage(selectedCode.id, usagePage - 1)"
-                :disabled="usagePage === 1"
-                variant="outline"
-                size="sm"
-              >
-                <ChevronLeft class="h-4 w-4" />
-              </Button>
-              <span class="text-sm text-muted-foreground">
-                Page {{ usagePage }} of {{ Math.ceil(usageTotal / 20) }} ({{
-                  usageTotal
-                }}
-                total)
-              </span>
-              <Button
-                @click="loadCodeUsage(selectedCode.id, usagePage + 1)"
-                :disabled="usagePage >= Math.ceil(usageTotal / 20)"
-                variant="outline"
-                size="sm"
-              >
-                <ChevronRight class="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </Card>
-      </div>
+      </template>
     </div>
   </div>
 </template>
